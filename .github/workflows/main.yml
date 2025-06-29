@@ -62,6 +62,7 @@ jobs:
       - name: Build .asi with qmake and make (i686)
         run: |
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
+          # Указываем -spec win32-g++ чтобы qmake не пытался использовать 64-битный компилятор!
           $QMAKE -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 

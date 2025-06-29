@@ -60,12 +60,96 @@ jobs:
     
     - name: Fix pro file
       run: |
-        # Создаем исправленный .pro файл
-        (Get-Content CustomLoadScreen.pro) -replace 'LIBS \+= -ld3d9 \\$', 'LIBS += -ld3d9 \' | Set-Content CustomLoadScreen.pro.tmp
-        Add-Content CustomLoadScreen.pro.tmp "        -ld3dx9 \"
-        Add-Content CustomLoadScreen.pro.tmp "        -lgdi32 \"
-        Add-Content CustomLoadScreen.pro.tmp "        -luser32"
-        Move-Item CustomLoadScreen.pro.tmp CustomLoadScreen.pro
+        # Исправляем незавершенную строку LIBS в .pro файле
+        $content = Get-Content CustomLoadScreen.pro
+        $content = $content -replace 'LIBS \+= -ld3d9 \\
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
+        $content = $content -replace '\s*-ld3dx9 \\
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
+        $content = $content -replace '\s*-lgdi32 \\
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
+        $content = $content -replace '\s*-luser32 \\
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
+        $content = $content -replace '\s*-
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
+        $content += ""
+        $content += "LIBS += -ld3d9 -ld3dx9 -lgdi32 -luser32"
+        $content | Set-Content CustomLoadScreen.pro -Force
       shell: powershell
     
     - name: Generate Makefile

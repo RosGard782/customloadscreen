@@ -1,92 +1,204 @@
-name: Build CustomLoadScreen
+name: Build CustomLoadScreen ASI
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
-    
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v4
       with:
-        version: '5.15.2'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_mingw81'
-        tools: 'tools_mingw,qt.tools.win64_mingw810'
-    
-    - name: Create missing header file
+        submodules: recursive
+
+    - name: Install dependencies
       run: |
-        @"
-        #ifndef CUSTOMLOADSCREEN_H
-        #define CUSTOMLOADSCREEN_H
-        
-        #include <QObject>
-        #include <d3d9.h>
-        #include <QString>
-        
-        // Forward declarations
-        class CFont;
-        class CTexture;
-        
-        class CustomLoadScreen : public QObject
-        {
-            Q_OBJECT
-        
-        public:
-            explicit CustomLoadScreen(QObject *parent = nullptr);
-            ~CustomLoadScreen();
-        
-            void Loop();
-            bool Event(UINT uMsg, WPARAM wParam, LPARAM lParam);
-            HRESULT Present(const RECT *pSourceRect, const RECT *pDestRect,
-                           HWND hDestWindowOverride, const RGNDATA *pDirtyRegion);
-        
-        private:
-            bool init = false;
-            CFont* pFont;
-            CTexture* pTexture;
-        };
-        
-        #endif // CUSTOMLOADSCREEN_H
-        "@ | Out-File -FilePath "CustomLoadScreen.h" -Encoding UTF8
-      shell: powershell
-    
-    - name: Fix pro file
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          mingw-w64 \
+          mingw-w64-tools \
+          qt5-qmake \
+          qtbase5-dev \
+          qtbase5-dev-tools \
+          wine \
+          wget \
+          unzip
+
+    - name: Install Qt5 for MinGW
       run: |
-        $content = Get-Content CustomLoadScreen.pro
-        $content = $content -replace 'LIBS \+= -ld3d9 \\', ''
-        $content = $content -replace '\s*-ld3dx9 \\', ''
-        $content = $content -replace '\s*-lgdi32 \\', ''
-        $content = $content -replace '\s*-luser32 \\', ''
-        $content += ""
-        $content += "LIBS += -ld3d9 -ld3dx9 -lgdi32 -luser32"
-        $content += ""
-        $content += "# Disable all warnings as errors"
-        $content += "QMAKE_CXXFLAGS += -Wno-error"
-        $content += "QMAKE_CXXFLAGS += -w"
-        $content | Set-Content CustomLoadScreen.pro -Force
-      shell: powershell
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
+        # Download and install Qt5 for MinGW cross-compilation
+        wget -q https://download.qt.io/official_releases/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz
+        tar -xf qt-everywhere-src-5.15.2.tar.xz
+        cd qt-everywhere-src-5.15.2
+        
+        # Configure Qt for MinGW cross-compilation
+        ./configure \
+          -opensource \
+          -confirm-license \
+          -xplatform win32-g++ \
+          -device-option CROSS_COMPILE=x86_64-w64-mingw32- \
+          -prefix /opt/qt5-mingw \
+          -no-opengl \
+          -no-dbus \
+          -no-vcproj \
+          -no-qml-debug \
+          -no-multimedia \
+          -no-audio-backend \
+          -no-wmf-backend \
+          -no-qt3support \
+          -no-webkit \
+          -no-phonon \
+          -no-phonon-backend \
+          -no-svg \
+          -no-declarative \
+          -no-declarative-debug \
+          -no-script \
+          -no-scripttools \
+          -nomake examples \
+          -nomake demos \
+          -nomake tests
+        
+        make -j$(nproc)
+        sudo make install
+
+    - name: Download DirectX SDK headers
+      run: |
+        # Create DirectX headers directory
+        sudo mkdir -p /usr/x86_64-w64-mingw32/include/d3d9
+        
+        # Download basic DirectX 9 headers (alternative approach)
+        wget -q https://raw.githubusercontent.com/apitrace/dxsdk/master/Include/d3d9.h -O /tmp/d3d9.h
+        wget -q https://raw.githubusercontent.com/apitrace/dxsdk/master/Include/d3dx9.h -O /tmp/d3dx9.h
+        wget -q https://raw.githubusercontent.com/apitrace/dxsdk/master/Include/d3dx9core.h -O /tmp/d3dx9core.h
+        
+        sudo cp /tmp/d3d9*.h /usr/x86_64-w64-mingw32/include/
+        
+        # Create symbolic links for library files
+        sudo mkdir -p /usr/x86_64-w64-mingw32/lib
+        
+        # Download DirectX libraries
+        wget -q https://github.com/microsoft/DirectXTK/releases/download/feb2023/directxtk_desktop_win10_2022.zip -O /tmp/dx.zip
+        cd /tmp && unzip -q dx.zip || true
+
+    - name: Set up environment variables
+      run: |
+        echo "QTDIR=/opt/qt5-mingw" >> $GITHUB_ENV
+        echo "PATH=/opt/qt5-mingw/bin:$PATH" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/opt/qt5-mingw/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+    - name: Create qmake cross-compilation spec
+      run: |
+        sudo mkdir -p /opt/qt5-mingw/mkspecs/win32-g++-cross
+        cat > /tmp/qmake.conf << 'EOF'
+        MAKEFILE_GENERATOR      = MINGW
+        QMAKE_PLATFORM          = win32 mingw
+        CONFIG                 += debug_and_release debug_and_release_target precompile_header
+        DEFINES                += UNICODE _UNICODE WIN32 MINGW_HAS_SECURE_API=1
+        QMAKE_COMPILER_DEFINES += __GNUC__ WIN32
+
+        QMAKE_CC                = x86_64-w64-mingw32-gcc
+        QMAKE_CXX               = x86_64-w64-mingw32-g++
+        QMAKE_LINK              = x86_64-w64-mingw32-g++
+        QMAKE_LINK_SHLIB        = x86_64-w64-mingw32-g++
+
+        QMAKE_AR                = x86_64-w64-mingw32-ar -ru
+        QMAKE_OBJCOPY           = x86_64-w64-mingw32-objcopy
+        QMAKE_NM                = x86_64-w64-mingw32-nm -P
+        QMAKE_STRIP             = x86_64-w64-mingw32-strip
+
+        QMAKE_INCDIR            = /usr/x86_64-w64-mingw32/include
+        QMAKE_LIBDIR            = /usr/x86_64-w64-mingw32/lib
+
+        QMAKE_RC                = x86_64-w64-mingw32-windres
+        QMAKE_LFLAGS           += -Wl,-subsystem,windows
+        QMAKE_LFLAGS_RELEASE   += -static -static-libgcc -static-libstdc++
+
+        load(qt_config)
+        EOF
+        
+        sudo cp /tmp/qmake.conf /opt/qt5-mingw/mkspecs/win32-g++-cross/
+        echo "include(../common/g++-win32.conf)" | sudo tee /opt/qt5-mingw/mkspecs/win32-g++-cross/qmake.conf
+        echo "load(qt_config)" | sudo tee -a /opt/qt5-mingw/mkspecs/win32-g++-cross/qmake.conf
+
     - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
+      run: |
+        # Ensure we're in the right directory
+        ls -la
+        
+        # Check if .pro file exists
+        if [ ! -f "CustomLoadScreen.pro" ]; then
+          echo "Error: CustomLoadScreen.pro not found!"
+          find . -name "*.pro" -type f
+          exit 1
+        fi
+        
+        # Generate Makefile
+        export QTDIR=/opt/qt5-mingw
+        export PATH=/opt/qt5-mingw/bin:$PATH
+        
+        # Try to use system qmake with cross-compilation
+        x86_64-w64-mingw32-qmake-qt5 CustomLoadScreen.pro || qmake -spec linux-g++-64 CustomLoadScreen.pro
+        
+        # Build the project
+        make -j$(nproc)
+        
+        # Check if build was successful
+        if [ -f "CustomLoadScreen.asi" ]; then
+          echo "Build successful! CustomLoadScreen.asi created."
+          ls -la CustomLoadScreen.asi
+          file CustomLoadScreen.asi
+        else
+          echo "Build failed! No .asi file found."
+          find . -name "*.asi" -o -name "*.dll" -o -name "*.so" | head -10
+          exit 1
+        fi
+
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v4
+      if: success()
       with:
-        name: CustomLoadScreen-build
+        name: CustomLoadScreen-ASI
         path: |
-          *.asi
+          CustomLoadScreen.asi
           *.dll
           *.exe
         retention-days: 30
+
+    - name: Create Release
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: CustomLoadScreen Build ${{ github.run_number }}
+        files: |
+          CustomLoadScreen.asi
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Debug information
+      if: failure()
+      run: |
+        echo "=== Debug Information ==="
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Qt version and tools:"
+        which qmake || echo "qmake not found"
+        qmake -v || echo "qmake version failed"
+        echo "MinGW tools:"
+        which x86_64-w64-mingw32-gcc || echo "mingw gcc not found"
+        x86_64-w64-mingw32-gcc --version || echo "mingw gcc version failed"
+        echo "Environment variables:"
+        env | grep -i qt || echo "No Qt env vars"
+        echo "Make output (last 50 lines):"
+        tail -50 make.log || echo "No make log found"

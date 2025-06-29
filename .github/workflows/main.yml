@@ -24,21 +24,46 @@ jobs:
             libssl-dev libtool-bin libxml-parser-perl lzip make openssl \
             python3 python3-mako python3-pip ruby sed unzip wget xz-utils
 
-      - name: Clone MXE
+      - name: Cache MXE build
+        uses: actions/cache@v4
+        with:
+          path: mxe
+          key: mxe-qtbase-v2-${{ runner.os }}-${{ hashFiles('**/mxe-version.txt') }}
+          restore-keys: |
+            mxe-qtbase-v2-${{ runner.os }}-
+
+      - name: Prepare mxe-version.txt
+        run: |
+          echo "qtbase" > mxe-version.txt
+
+      - name: Clone and download MXE Qt5 (if not cached)
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/mxe/mxe.git --depth=1
           cd mxe
-          make download qt5
+          make download qtbase
 
-      - name: Build MXE with Qt5 (this will take a while)
+      - name: Build MXE qtbase (Qt5, if not cached)
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cd mxe
-          make qt5 -j$(nproc)
+          make qtbase -j$(nproc)
+
+      - name: Find qmake
+        id: find-qmake
+        run: |
+          QMAKE=$(find $GITHUB_WORKSPACE/mxe/usr/ -type f -name qmake | grep qt5 | head -n 1)
+          if [ -z "$QMAKE" ]; then
+            echo "qmake not found"
+            exit 1
+          fi
+          echo "QMAKE=$QMAKE" >> $GITHUB_ENV
+          echo "Found qmake at $QMAKE"
 
       - name: Build .asi with qmake and make
         run: |
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
-          $GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake CONFIG+=release CustomLoadScreen.pro
+          $QMAKE CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts

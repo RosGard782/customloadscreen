@@ -2,9 +2,9 @@ name: Build ASI with Qt (MSVC)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
 
       - name: Build with qmake + nmake (MSVC)
         run: |
-          qmake CustomLoadScreen.pro
+          qmake -spec win32-msvc "CONFIG+=release" CustomLoadScreen.pro
           nmake
 
       - name: Upload ASI artifact

@@ -84,7 +84,7 @@ jobs:
           *.dll
           *.exe
         retention-days: 30, ''
-        $content += ""
+        $content += "" 
         $content += "LIBS += -ld3d9 -ld3dx9 -lgdi32 -luser32"
         $content += ""
         $content += "# Disable warnings as errors"

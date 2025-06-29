@@ -57,12 +57,14 @@ jobs:
             exit 1
           fi
           echo "QMAKE=$QMAKE" >> $GITHUB_ENV
-          echo "Found qmake at $QMAKE"
 
       - name: Build .asi with qmake and make (i686)
         run: |
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
-          # Указываем -spec win32-g++ чтобы qmake не пытался использовать 64-битный компилятор!
+          export QMAKESPEC=$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5/mkspecs/win32-g++
+          export QTDIR=$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5
+          export CC=i686-w64-mingw32.static-gcc
+          export CXX=i686-w64-mingw32.static-g++
           $QMAKE -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 

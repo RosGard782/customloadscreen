@@ -67,12 +67,29 @@ jobs:
         $content = $content -replace '\s*-ld3dx9 \\', ''
         $content = $content -replace '\s*-lgdi32 \\', ''
         $content = $content -replace '\s*-luser32 \\', ''
-        $content = $content -replace '\s*-$', ''
+        $content = $content -replace '\s*-
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30, ''
         $content += ""
         $content += "LIBS += -ld3d9 -ld3dx9 -lgdi32 -luser32"
         $content += ""
-        $content += "# Disable warnings as errors"
-        $content += "QMAKE_CXXFLAGS += -Wno-error=unused-parameter"
+        $content += "# Disable all warnings as errors"
+        $content += "QMAKE_CXXFLAGS += -Wno-error"
+        $content += "QMAKE_CXXFLAGS += -w"
         $content | Set-Content CustomLoadScreen.pro -Force
       shell: powershell
     

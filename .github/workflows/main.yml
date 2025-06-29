@@ -72,22 +72,28 @@ jobs:
         QMAKE_BINARY=""
         
         # Check common qmake locations in order of preference
-        QMAKE_CANDIDATES=(
-          "${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
-          "${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
-          "${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
-          "${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
-        )
+        echo "Checking qmake locations..."
         
-        for candidate in "${QMAKE_CANDIDATES[@]}"; do
-          if [ -x "$candidate" ]; then
-            echo "Found qmake at: $candidate"
-            QMAKE_BINARY="$candidate"
-            break
-          else
-            echo "Not found: $candidate"
-          fi
-        done
+        # Try each location individually
+        if [ -x "${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5" ]; then
+          echo "Found qmake at: ${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
+          QMAKE_BINARY="${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
+        elif [ -x "${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake" ]; then
+          echo "Found qmake at: ${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
+          QMAKE_BINARY="${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
+        elif [ -x "${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5" ]; then
+          echo "Found qmake at: ${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
+          QMAKE_BINARY="${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
+        elif [ -x "${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake" ]; then
+          echo "Found qmake at: ${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
+          QMAKE_BINARY="${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
+        else
+          echo "Standard locations failed, checking all candidates:"
+          echo "  ${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
+          echo "  ${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
+          echo "  ${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
+          echo "  ${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
+        fi
         
         # If still not found, do a comprehensive search
         if [ -z "$QMAKE_BINARY" ]; then

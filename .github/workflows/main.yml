@@ -24,9 +24,19 @@ jobs:
         export PATH="/mxe/usr/bin/:${PATH}"
         echo "PATH=/mxe/usr/bin/:${PATH}" >> $GITHUB_ENV
         
-        # Verify MXE tools are available
-        which i686-w64-mingw32.static.posix-gcc || echo "MXE gcc not found"
-        ls -la /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/ || echo "Qt5 tools not found"
+        # Find MXE structure
+        echo "=== MXE Directory Structure ==="
+        ls -la /mxe/ 2>/dev/null || echo "/mxe not found"
+        ls -la /mxe/usr/ 2>/dev/null || echo "/mxe/usr not found"
+        ls -la /mxe/usr/bin/ 2>/dev/null || echo "/mxe/usr/bin not found"
+        
+        # Find Qt5 installation
+        echo "=== Looking for Qt5 ==="
+        find /mxe -name "qmake*" -type f 2>/dev/null || echo "No qmake found"
+        find /mxe -name "*mingw*" -type d | head -10 || echo "No mingw dirs found"
+        
+        # Find correct MXE target
+        ls -la /mxe/usr/ | grep mingw || echo "No mingw targets found"
 
     - name: Build project
       run: |
@@ -39,13 +49,42 @@ jobs:
         echo "Available files:"
         ls -la
         
-        echo "=== Qt5 and MXE tools check ==="
-        which qmake || echo "qmake not in PATH"
-        /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake --version || echo "MXE qmake version failed"
+        echo "=== Find correct qmake path ==="
+        QMAKE_PATH=""
+        
+        # Try to find qmake in various possible locations
+        for path in \
+          "/mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake" \
+          "/mxe/usr/i686-w64-mingw32.static/qt5/bin/qmake" \
+          "/mxe/usr/i686-w64-mingw32.shared.posix/qt5/bin/qmake" \
+          "/mxe/usr/i686-w64-mingw32.shared/qt5/bin/qmake" \
+          "/mxe/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5" \
+          "/mxe/usr/bin/i686-w64-mingw32.static-qmake-qt5" \
+          "/mxe/usr/bin/i686-w64-mingw32-qmake-qt5" \
+          $(find /mxe -name "*qmake*" -type f 2>/dev/null)
+        do
+          if [ -x "$path" ]; then
+            echo "Found qmake at: $path"
+            QMAKE_PATH="$path"
+            break
+          fi
+        done
+        
+        if [ -z "$QMAKE_PATH" ]; then
+          echo "ERROR: Could not find qmake"
+          echo "Available MXE targets:"
+          ls -la /mxe/usr/ | grep mingw
+          echo "Available binaries:"
+          ls -la /mxe/usr/bin/ | grep qmake
+          exit 1
+        fi
+        
+        echo "Using qmake: $QMAKE_PATH"
+        $QMAKE_PATH --version
         
         echo "=== Building project ==="
-        # Use the same command as in GitLab CI
-        /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake CONFIG+=release CustomLoadScreen.pro
+        # Use found qmake path
+        $QMAKE_PATH CONFIG+=release CustomLoadScreen.pro
         
         # Check if Makefile was generated
         if [ -f "Makefile" ]; then

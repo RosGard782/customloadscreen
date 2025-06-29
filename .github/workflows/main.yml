@@ -25,128 +25,49 @@ jobs:
     
     - name: Create missing header file
       run: |
-        echo "#ifndef CUSTOMLOADSCREEN_H" > CustomLoadScreen.h
-        echo "#define CUSTOMLOADSCREEN_H" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "#include <QObject>" >> CustomLoadScreen.h
-        echo "#include <d3d9.h>" >> CustomLoadScreen.h
-        echo "#include <QString>" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "// Forward declarations" >> CustomLoadScreen.h
-        echo "class CFont;" >> CustomLoadScreen.h
-        echo "class CTexture;" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "class CustomLoadScreen : public QObject" >> CustomLoadScreen.h
-        echo "{" >> CustomLoadScreen.h
-        echo "    Q_OBJECT" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "public:" >> CustomLoadScreen.h
-        echo "    explicit CustomLoadScreen(QObject *parent = nullptr);" >> CustomLoadScreen.h
-        echo "    ~CustomLoadScreen();" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "    void Loop();" >> CustomLoadScreen.h
-        echo "    bool Event(UINT uMsg, WPARAM wParam, LPARAM lParam);" >> CustomLoadScreen.h
-        echo "    HRESULT Present(const RECT *pSourceRect, const RECT *pDestRect," >> CustomLoadScreen.h
-        echo "                   HWND hDestWindowOverride, const RGNDATA *pDirtyRegion);" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "private:" >> CustomLoadScreen.h
-        echo "    bool init = false;" >> CustomLoadScreen.h
-        echo "    CFont* pFont;" >> CustomLoadScreen.h
-        echo "    CTexture* pTexture;" >> CustomLoadScreen.h
-        echo "};" >> CustomLoadScreen.h
-        echo "" >> CustomLoadScreen.h
-        echo "#endif // CUSTOMLOADSCREEN_H" >> CustomLoadScreen.h
-      shell: cmd
+        @"
+        #ifndef CUSTOMLOADSCREEN_H
+        #define CUSTOMLOADSCREEN_H
+        
+        #include <QObject>
+        #include <d3d9.h>
+        #include <QString>
+        
+        // Forward declarations
+        class CFont;
+        class CTexture;
+        
+        class CustomLoadScreen : public QObject
+        {
+            Q_OBJECT
+        
+        public:
+            explicit CustomLoadScreen(QObject *parent = nullptr);
+            ~CustomLoadScreen();
+        
+            void Loop();
+            bool Event(UINT uMsg, WPARAM wParam, LPARAM lParam);
+            HRESULT Present(const RECT *pSourceRect, const RECT *pDestRect,
+                           HWND hDestWindowOverride, const RGNDATA *pDirtyRegion);
+        
+        private:
+            bool init = false;
+            CFont* pFont;
+            CTexture* pTexture;
+        };
+        
+        #endif // CUSTOMLOADSCREEN_H
+        "@ | Out-File -FilePath "CustomLoadScreen.h" -Encoding UTF8
+      shell: powershell
     
     - name: Fix pro file
       run: |
-        # Исправляем незавершенную строку LIBS в .pro файле
         $content = Get-Content CustomLoadScreen.pro
-        $content = $content -replace 'LIBS \+= -ld3d9 \\
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
-    - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-build
-        path: |
-          *.asi
-          *.dll
-          *.exe
-        retention-days: 30, ''
-        $content = $content -replace '\s*-ld3dx9 \\
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
-    - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-build
-        path: |
-          *.asi
-          *.dll
-          *.exe
-        retention-days: 30, ''
-        $content = $content -replace '\s*-lgdi32 \\
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
-    - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-build
-        path: |
-          *.asi
-          *.dll
-          *.exe
-        retention-days: 30, ''
-        $content = $content -replace '\s*-luser32 \\
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
-    - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-build
-        path: |
-          *.asi
-          *.dll
-          *.exe
-        retention-days: 30, ''
-        $content = $content -replace '\s*-
-    
-    - name: Generate Makefile
-      run: qmake CustomLoadScreen.pro
-    
-    - name: Build project
-      run: mingw32-make
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-build
-        path: |
-          *.asi
-          *.dll
-          *.exe
-        retention-days: 30, ''
+        $content = $content -replace 'LIBS \+= -ld3d9 \\', ''
+        $content = $content -replace '\s*-ld3dx9 \\', ''
+        $content = $content -replace '\s*-lgdi32 \\', ''
+        $content = $content -replace '\s*-luser32 \\', ''
+        $content = $content -replace '\s*-$', ''
         $content += ""
         $content += "LIBS += -ld3d9 -ld3dx9 -lgdi32 -luser32"
         $content | Set-Content CustomLoadScreen.pro -Force

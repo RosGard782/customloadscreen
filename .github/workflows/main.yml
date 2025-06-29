@@ -1,0 +1,85 @@
+name: Build CustomLoadScreen
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '5.15.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_mingw81'
+        tools: 'tools_mingw,qt.tools.win64_mingw810'
+    
+    - name: Create missing header file
+      run: |
+        echo "#ifndef CUSTOMLOADSCREEN_H" > CustomLoadScreen.h
+        echo "#define CUSTOMLOADSCREEN_H" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "#include <QObject>" >> CustomLoadScreen.h
+        echo "#include <d3d9.h>" >> CustomLoadScreen.h
+        echo "#include <QString>" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "// Forward declarations" >> CustomLoadScreen.h
+        echo "class CFont;" >> CustomLoadScreen.h
+        echo "class CTexture;" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "class CustomLoadScreen : public QObject" >> CustomLoadScreen.h
+        echo "{" >> CustomLoadScreen.h
+        echo "    Q_OBJECT" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "public:" >> CustomLoadScreen.h
+        echo "    explicit CustomLoadScreen(QObject *parent = nullptr);" >> CustomLoadScreen.h
+        echo "    ~CustomLoadScreen();" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "    void Loop();" >> CustomLoadScreen.h
+        echo "    bool Event(UINT uMsg, WPARAM wParam, LPARAM lParam);" >> CustomLoadScreen.h
+        echo "    HRESULT Present(const RECT *pSourceRect, const RECT *pDestRect," >> CustomLoadScreen.h
+        echo "                   HWND hDestWindowOverride, const RGNDATA *pDirtyRegion);" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "private:" >> CustomLoadScreen.h
+        echo "    bool init = false;" >> CustomLoadScreen.h
+        echo "    CFont* pFont;" >> CustomLoadScreen.h
+        echo "    CTexture* pTexture;" >> CustomLoadScreen.h
+        echo "};" >> CustomLoadScreen.h
+        echo "" >> CustomLoadScreen.h
+        echo "#endif // CUSTOMLOADSCREEN_H" >> CustomLoadScreen.h
+      shell: cmd
+    
+    - name: Fix pro file
+      run: |
+        # Создаем исправленный .pro файл
+        (Get-Content CustomLoadScreen.pro) -replace 'LIBS \+= -ld3d9 \\$', 'LIBS += -ld3d9 \' | Set-Content CustomLoadScreen.pro.tmp
+        Add-Content CustomLoadScreen.pro.tmp "        -ld3dx9 \"
+        Add-Content CustomLoadScreen.pro.tmp "        -lgdi32 \"
+        Add-Content CustomLoadScreen.pro.tmp "        -luser32"
+        Move-Item CustomLoadScreen.pro.tmp CustomLoadScreen.pro
+      shell: powershell
+    
+    - name: Generate Makefile
+      run: qmake CustomLoadScreen.pro
+    
+    - name: Build project
+      run: mingw32-make
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: CustomLoadScreen-build
+        path: |
+          *.asi
+          *.dll
+          *.exe
+        retention-days: 30

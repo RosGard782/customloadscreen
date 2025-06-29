@@ -1,4 +1,4 @@
-name: Build ASI (QMake/Qt DLL)
+name: Build ASI with Qt (MSVC)
 
 on:
   push:
@@ -12,28 +12,25 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Qt (5.15.2)
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '5.15.2'
-        target: 'desktop'
-        arch: 'win64_msvc2019_64'
-        # Можно попробовать arch: 'win64_mingw81' если нужен MinGW
+      - name: Set up Qt 5.15.2 (MSVC2019_64)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          arch: 'win64_msvc2019_64'
 
-    - name: Set up MSVC developer command prompt
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Build with qmake and nmake
-      run: |
-        cd ${{ github.workspace }}
-        qmake CustomLoadScreen.pro
-        nmake
+      - name: Build with qmake + nmake (MSVC)
+        run: |
+          qmake CustomLoadScreen.pro
+          nmake
 
-    - name: Upload ASI artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CustomLoadScreen-asi
-        path: ../CustomLoadScreen.asi
+      - name: Upload ASI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CustomLoadScreen-asi
+          path: ../CustomLoadScreen.asi

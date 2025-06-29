@@ -1,302 +1,34 @@
-name: Build CustomLoadScreen ASI
+name: Build .asi Script
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container:
-      image: openscad/mxe-i686-deps
-    
+    runs-on: windows-latest
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
-    - name: Setup MXE environment
+    - name: Set up MSBuild Path
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Set up Visual Studio shell
+      uses: egor-tensin/vs-shell@v2
+
+    - name: Build .asi Script
       run: |
-        # Set up MXE environment
-        export MXE_ROOT="/mxe"
-        export MXE_TARGET="i686-w64-mingw32.static.posix"
-        export PATH="${MXE_ROOT}/usr/bin:${MXE_ROOT}/usr/${MXE_TARGET}/bin:${PATH}"
-        
-        echo "MXE_ROOT=${MXE_ROOT}" >> $GITHUB_ENV
-        echo "MXE_TARGET=${MXE_TARGET}" >> $GITHUB_ENV
-        echo "PATH=${MXE_ROOT}/usr/bin:${MXE_ROOT}/usr/${MXE_TARGET}/bin:${PATH}" >> $GITHUB_ENV
-        
-        # Debug MXE installation
-        echo "=== MXE Environment Setup ==="
-        echo "MXE_ROOT: ${MXE_ROOT}"
-        echo "MXE_TARGET: ${MXE_TARGET}"
-        echo "PATH: ${PATH}"
-        
-        echo "=== Available MXE targets ==="
-        ls -la ${MXE_ROOT}/usr/ | grep mingw || echo "No mingw targets found"
-        
-        echo "=== MXE binaries ==="
-        ls -la ${MXE_ROOT}/usr/bin/ | grep -E "(qmake|gcc|g\+\+)" || echo "No relevant binaries found"
-        
-        echo "=== Target-specific binaries ==="
-        ls -la ${MXE_ROOT}/usr/${MXE_TARGET}/bin/ 2>/dev/null || echo "Target bin directory not found"
+        msbuild /t:Rebuild /p:Configuration=Release
+      # Если у вас проект в подпапке, добавьте путь: msbuild path\to\project.sln /t:Rebuild /p:Configuration=Release
 
-    - name: Install dependencies
-      run: |
-        # Update MXE packages if needed
-        echo "=== Checking for Qt5 installation ==="
-        
-        # Check if Qt5 is installed for our target
-        QT5_PATH="${MXE_ROOT}/usr/${MXE_TARGET}/qt5"
-        if [ -d "$QT5_PATH" ]; then
-          echo "Qt5 found at: $QT5_PATH"
-          ls -la "$QT5_PATH/bin/" 2>/dev/null || echo "Qt5 bin directory not found"
-        else
-          echo "Qt5 not found, checking alternative locations..."
-          find ${MXE_ROOT} -name "qt5" -type d 2>/dev/null || echo "No Qt5 directories found"
-        fi
-
-    - name: Build project
-      run: |
-        echo "=== Build Environment ==="
-        echo "Current directory: $(pwd)"
-        echo "Available files:"
-        ls -la
-        
-        # Find the correct qmake binary
-        echo "=== Finding qmake ==="
-        QMAKE_BINARY=""
-        
-        # Check common qmake locations in order of preference
-        echo "Checking qmake locations..."
-        
-        # Try each location individually
-        if [ -x "${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5" ]; then
-          echo "Found qmake at: ${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
-          QMAKE_BINARY="${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
-        elif [ -x "${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake" ]; then
-          echo "Found qmake at: ${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
-          QMAKE_BINARY="${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
-        elif [ -x "${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5" ]; then
-          echo "Found qmake at: ${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
-          QMAKE_BINARY="${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
-        elif [ -x "${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake" ]; then
-          echo "Found qmake at: ${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
-          QMAKE_BINARY="${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
-        else
-          echo "Standard locations failed, checking all candidates:"
-          echo "  ${MXE_ROOT}/usr/bin/${MXE_TARGET}-qmake-qt5"
-          echo "  ${MXE_ROOT}/usr/${MXE_TARGET}/qt5/bin/qmake"
-          echo "  ${MXE_ROOT}/usr/bin/i686-w64-mingw32.static.posix-qmake-qt5"
-          echo "  ${MXE_ROOT}/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake"
-        fi
-        
-        # If still not found, do a comprehensive search
-        if [ -z "$QMAKE_BINARY" ]; then
-          echo "Performing comprehensive qmake search..."
-          FOUND_QMAKE=$(find ${MXE_ROOT} -name "*qmake*" -type f -executable 2>/dev/null | head -1)
-          if [ -n "$FOUND_QMAKE" ]; then
-            echo "Found qmake via search: $FOUND_QMAKE"
-            QMAKE_BINARY="$FOUND_QMAKE"
-          fi
-        fi
-        
-        if [ -z "$QMAKE_BINARY" ]; then
-          echo "ERROR: qmake not found!"
-          echo "Available executables in MXE:"
-          find ${MXE_ROOT}/usr/bin -name "*qmake*" -o -name "*qt*" 2>/dev/null || echo "No Qt-related binaries found"
-          echo "Directory structure:"
-          find ${MXE_ROOT}/usr -maxdepth 3 -type d -name "*qt*" 2>/dev/null || echo "No Qt directories found"
-          exit 1
-        fi
-        
-        echo "Using qmake: $QMAKE_BINARY"
-        
-        # Verify qmake works
-        echo "=== Verifying qmake ==="
-        "$QMAKE_BINARY" -version || {
-          echo "ERROR: qmake version check failed"
-          exit 1
-        }
-        
-        # Check for project file
-        echo "=== Project files ==="
-        if [ -f "CustomLoadScreen.pro" ]; then
-          echo "Found CustomLoadScreen.pro"
-          cat CustomLoadScreen.pro
-        else
-          echo "ERROR: CustomLoadScreen.pro not found"
-          echo "Available .pro files:"
-          find . -name "*.pro" || echo "No .pro files found"
-          exit 1
-        fi
-        
-        # Generate Makefile
-        echo "=== Generating Makefile ==="
-        "$QMAKE_BINARY" CONFIG+=release CustomLoadScreen.pro || {
-          echo "ERROR: qmake failed"
-          exit 1
-        }
-        
-        # Verify Makefile was created
-        if [ ! -f "Makefile" ]; then
-          echo "ERROR: Makefile not generated"
-          exit 1
-        fi
-        
-        echo "Makefile generated successfully"
-        
-        # Build the project
-        echo "=== Building project ==="
-        make -j$(nproc) || {
-          echo "ERROR: Build failed"
-          echo "Make output (last 100 lines):"
-          tail -100 make.log 2>/dev/null || echo "No make log available"
-          exit 1
-        }
-        
-        echo "=== Build completed ==="
-        
-        # Check build results
-        echo "=== Checking build artifacts ==="
-        ls -la
-        
-        # Look for the ASI file
-        if [ -f "CustomLoadScreen.asi" ]; then
-          echo "SUCCESS: CustomLoadScreen.asi built!"
-          ls -la CustomLoadScreen.asi
-          file CustomLoadScreen.asi || echo "file command not available"
-        elif [ -f "release/CustomLoadScreen.asi" ]; then
-          echo "SUCCESS: CustomLoadScreen.asi found in release directory!"
-          mv release/CustomLoadScreen.asi ./
-          ls -la CustomLoadScreen.asi
-        else
-          echo "ERROR: CustomLoadScreen.asi not found"
-          echo "Searching for output files..."
-          find . -name "*.asi" -o -name "*.dll" -o -name "*.exe" 2>/dev/null || echo "No output files found"
-          echo "Release directory contents:"
-          ls -la release/ 2>/dev/null || echo "No release directory"
-          exit 1
-        fi
-
-    - name: Verify artifacts
-      run: |
-        echo "=== Final verification ==="
-        
-        # Check main ASI file
-        if [ -f "CustomLoadScreen.asi" ]; then
-          echo "✓ CustomLoadScreen.asi exists"
-          echo "  Size: $(stat -c%s CustomLoadScreen.asi 2>/dev/null || echo 'unknown') bytes"
-          echo "  Type: $(file CustomLoadScreen.asi 2>/dev/null || echo 'unknown')"
-        else
-          echo "✗ CustomLoadScreen.asi missing"
-        fi
-        
-        # Check optional PNG file
-        if [ -f "CustomLoadScreen.png" ]; then
-          echo "✓ CustomLoadScreen.png exists"
-        else
-          echo "ℹ CustomLoadScreen.png not found (optional)"
-        fi
-        
-        # List all potential artifacts
-        echo "=== All build artifacts ==="
-        find . -name "*.asi" -o -name "*.dll" -o -name "*.exe" -o -name "*.png" 2>/dev/null || echo "No artifacts found"
-
-    - name: Upload build artifacts
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
-      if: success()
       with:
-        name: CustomLoadScreen-ASI-Build-${{ github.sha }}
+        name: asi-script
         path: |
-          CustomLoadScreen.asi
-          CustomLoadScreen.png
-        retention-days: 30
-
-    - name: Create Release
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ github.run_number }}
-        name: CustomLoadScreen Release v${{ github.run_number }}
-        body: |
-          Automated build of CustomLoadScreen ASI
-          
-          **Build Information:**
-          - Commit: ${{ github.sha }}
-          - Build Date: ${{ github.event.head_commit.timestamp }}
-          - Target: Windows 32-bit (i686)
-          
-          **Files included:**
-          - `CustomLoadScreen.asi` - Main ASI plugin file
-          - `CustomLoadScreen.png` - Loading screen image (if available)
-          
-          **Installation:**
-          1. Download `CustomLoadScreen.asi`
-          2. Place it in your game's root directory or scripts folder
-          3. Ensure `CustomLoadScreen.png` is in the same directory if using custom image
-          
-          **System Requirements:**
-          - Windows (32-bit or 64-bit)
-          - Compatible ASI loader installed
-        files: |
-          CustomLoadScreen.asi
-          CustomLoadScreen.png
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Cache MXE tools
-      uses: actions/cache@v4
-      with:
-        path: |
-          /mxe/usr/bin
-          /mxe/usr/i686-w64-mingw32.static.posix
-        key: ${{ runner.os }}-mxe-tools-${{ hashFiles('**/CustomLoadScreen.pro') }}
-        restore-keys: |
-          ${{ runner.os }}-mxe-tools-
-
-    - name: Debug on failure
-      if: failure()
-      run: |
-        echo "=== DEBUG INFORMATION ==="
-        echo "Working directory: $(pwd)"
-        echo "Environment variables:"
-        env | grep -E "(MXE|PATH|QT)" || echo "No relevant env vars"
-        
-        echo "=== Directory contents ==="
-        ls -la
-        
-        echo "=== MXE installation ==="
-        ls -la ${MXE_ROOT}/usr/ 2>/dev/null || echo "MXE usr directory not accessible"
-        ls -la ${MXE_ROOT}/usr/bin/ 2>/dev/null || echo "MXE bin directory not accessible"
-        
-        echo "=== Target directory ==="
-        ls -la ${MXE_ROOT}/usr/${MXE_TARGET}/ 2>/dev/null || echo "Target directory not accessible"
-        
-        echo "=== Makefile (if exists) ==="
-        if [ -f "Makefile" ]; then
-          echo "First 50 lines of Makefile:"
-          head -50 Makefile
-        else
-          echo "No Makefile found"
-        fi
-        
-        echo "=== Build logs ==="
-        for log in make.log build.log *.log; do
-          if [ -f "$log" ]; then
-            echo "=== $log ==="
-            tail -50 "$log"
-          fi
-        done
-        
-        echo "=== qmake search results ==="
-        find ${MXE_ROOT} -name "*qmake*" -type f 2>/dev/null || echo "No qmake files found"
-        
-        echo "=== Qt directories ==="
-        find ${MXE_ROOT} -name "*qt*" -type d 2>/dev/null | head -10 || echo "No Qt directories found"
+          **\*.asi

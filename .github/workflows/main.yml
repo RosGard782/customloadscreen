@@ -1,36 +1,52 @@
-name: Build ASI with Qt (MSVC)
+name: Build .asi Script
 
 on:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [main, master]
-  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Qt 5.15.2 (MSVC2019_64)
-        uses: jurplel/install-qt-action@v4
         with:
-          version: '5.15.2'
-          arch: 'win64_msvc2019_64'
+          submodules: recursive
 
-      - name: Set up MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Build with qmake + nmake (MSVC)
+      - name: Set up MXE and Qt5 (MinGW-w64 32-bit)
         run: |
-          qmake -spec win32-msvc "CONFIG+=release" CustomLoadScreen.pro
-          nmake
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https
+          # Install MXE dependencies
+          sudo apt-get install -y \
+            autoconf automake autopoint bash bison bzip2 cmake flex g++ gperf intltool \
+            libffi-dev libgdk-pixbuf2.0-dev libgl1-mesa-dev libltdl-dev \
+            libssl-dev libtool-bin libxml-parser-perl lzip make openssl \
+            python3 python3-mako python3-pip ruby sed unzip wget xz-utils
+          # Download and extract MXE with Qt5
+          wget https://github.com/mxe/mxe/releases/download/v20240510/mxe-20240510.tar.xz
+          tar -xf mxe-20240510.tar.xz
+          sudo mv mxe /opt/mxe
+        shell: bash
 
-      - name: Upload ASI artifact
+      - name: Set PATH for MXE
+        run: echo "/opt/mxe/usr/bin" >> $GITHUB_PATH
+
+      - name: Build .asi with qmake and make
+        run: |
+          /opt/mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake CONFIG+=release CustomLoadScreen.pro
+          make -j$(nproc)
+        env:
+          PATH: "/opt/mxe/usr/bin:${PATH}"
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: CustomLoadScreen-asi
-          path: ../CustomLoadScreen.asi
+          name: customloadscreen-artifacts
+          path: |
+            CustomLoadScreen.asi
+            CustomLoadScreen.png

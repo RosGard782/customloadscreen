@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: openscad/mxe-i686-deps
     
     steps:
     - name: Checkout repository
@@ -17,375 +19,133 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install MinGW and Qt5
+    - name: Setup MXE environment
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          mingw-w64 \
-          mingw-w64-tools \
-          qtbase5-dev-tools \
-          qt5-qmake \
-          wine \
-          wget \
-          unzip \
-          pkg-config
-
-    - name: Install Qt5 MinGW packages
-      run: |
-        # Install Qt5 cross-compilation tools
-        sudo apt-get install -y \
-          qtbase5-dev \
-          qttools5-dev \
-          qttools5-dev-tools
+        export PATH="/mxe/usr/bin/:${PATH}"
+        echo "PATH=/mxe/usr/bin/:${PATH}" >> $GITHUB_ENV
         
-        # Create MinGW Qt5 setup
-        sudo mkdir -p /usr/x86_64-w64-mingw32/include/QtCore
-        sudo mkdir -p /usr/x86_64-w64-mingw32/lib
-        
-        # Copy Qt headers to MinGW location
-        sudo cp -r /usr/include/x86_64-linux-gnu/qt5/* /usr/x86_64-w64-mingw32/include/ || true
-        sudo cp -r /usr/include/qt5/* /usr/x86_64-w64-mingw32/include/ || true
-
-    - name: Download and setup DirectX SDK
-      run: |
-        # Create DirectX include directory
-        sudo mkdir -p /usr/x86_64-w64-mingw32/include
-        
-        # Download DirectX 9 headers
-        cd /tmp
-        
-        # Get d3d9.h
-        cat > d3d9.h << 'EOF'
-        #ifndef _D3D9_H_
-        #define _D3D9_H_
-        
-        #include <windows.h>
-        #include <objbase.h>
-        
-        typedef struct IDirect3D9 IDirect3D9;
-        typedef struct IDirect3DDevice9 IDirect3DDevice9;
-        typedef struct IDirect3DTexture9 IDirect3DTexture9;
-        typedef struct IDirect3DSurface9 IDirect3DSurface9;
-        
-        typedef struct _D3DPRESENT_PARAMETERS_ {
-            UINT BackBufferWidth;
-            UINT BackBufferHeight;
-            UINT BackBufferFormat;
-            UINT BackBufferCount;
-            UINT MultiSampleType;
-            DWORD MultiSampleQuality;
-            UINT SwapEffect;
-            HWND hDeviceWindow;
-            BOOL Windowed;
-            BOOL EnableAutoDepthStencil;
-            UINT AutoDepthStencilFormat;
-            DWORD Flags;
-            UINT FullScreen_RefreshRateInHz;
-            UINT PresentationInterval;
-        } D3DPRESENT_PARAMETERS;
-        
-        #define D3D_OK 0
-        typedef HRESULT (WINAPI *PRESENT_FUNC)(CONST RECT*, CONST RECT*, HWND, CONST RGNDATA*);
-        
-        #endif
-        EOF
-        
-        # Get d3dx9.h
-        cat > d3dx9.h << 'EOF'
-        #ifndef _D3DX9_H_
-        #define _D3DX9_H_
-        
-        #include "d3d9.h"
-        
-        #endif
-        EOF
-        
-        # Get d3dx9core.h
-        cat > d3dx9core.h << 'EOF'
-        #ifndef _D3DX9CORE_H_
-        #define _D3DX9CORE_H_
-        
-        #include "d3d9.h"
-        
-        #endif
-        EOF
-        
-        # Copy headers
-        sudo cp d3d9*.h /usr/x86_64-w64-mingw32/include/
-        
-        # Create dummy libraries
-        sudo mkdir -p /usr/x86_64-w64-mingw32/lib
-        echo "INPUT(-lgdi32)" | sudo tee /usr/x86_64-w64-mingw32/lib/libd3d9.a
-        echo "INPUT(-lgdi32)" | sudo tee /usr/x86_64-w64-mingw32/lib/libd3dx9.a
-
-    - name: Create Qt MinGW mkspec
-      run: |
-        # Create custom mkspec for cross-compilation
-        sudo mkdir -p /usr/share/qt5/mkspecs/linux-mingw-w64-g++
-        
-        cat > /tmp/qmake.conf << 'EOF'
-        MAKEFILE_GENERATOR      = UNIX
-        CONFIG                 += incremental
-        QMAKE_INCREMENTAL_STYLE = sublib
-        
-        QMAKE_PLATFORM          = win32 mingw
-        
-        include(../common/unix.conf)
-        
-        QMAKE_CC                = x86_64-w64-mingw32-gcc
-        QMAKE_CXX               = x86_64-w64-mingw32-g++
-        QMAKE_LINK              = x86_64-w64-mingw32-g++
-        QMAKE_LINK_SHLIB        = x86_64-w64-mingw32-g++
-        
-        QMAKE_AR                = x86_64-w64-mingw32-ar cqs
-        QMAKE_OBJCOPY           = x86_64-w64-mingw32-objcopy
-        QMAKE_NM                = x86_64-w64-mingw32-nm -P
-        QMAKE_STRIP             = x86_64-w64-mingw32-strip
-        QMAKE_RANLIB            = x86_64-w64-mingw32-ranlib
-        
-        QMAKE_INCDIR           = /usr/x86_64-w64-mingw32/include
-        QMAKE_LIBDIR           = /usr/x86_64-w64-mingw32/lib
-        
-        QMAKE_RC               = x86_64-w64-mingw32-windres
-        
-        QMAKE_LFLAGS_RELEASE  += -static-libgcc -static-libstdc++
-        QMAKE_LFLAGS_DEBUG    += -static-libgcc -static-libstdc++
-        
-        load(qt_config)
-        EOF
-        
-        sudo cp /tmp/qmake.conf /usr/share/qt5/mkspecs/linux-mingw-w64-g++/
-        
-        cat > /tmp/qplatformdefs.h << 'EOF'
-        #include "../linux-g++/qplatformdefs.h"
-        EOF
-        
-        sudo cp /tmp/qplatformdefs.h /usr/share/qt5/mkspecs/linux-mingw-w64-g++/
-
-    - name: Fix Qt includes for project
-      run: |
-        # Create a simple Qt wrapper to avoid Qt dependency issues
-        sudo mkdir -p /usr/x86_64-w64-mingw32/include/QObject
-        
-        cat > /tmp/qobject_simple.h << 'EOF'
-        #ifndef QOBJECT_SIMPLE_H
-        #define QOBJECT_SIMPLE_H
-        
-        #include <windows.h>
-        
-        // Minimal Qt-like defines
-        #define Q_OBJECT
-        #define QString std::string
-        #define QFileInfo std::string
-        
-        class QObject {
-        public:
-            explicit QObject(QObject *parent = nullptr) {}
-            virtual ~QObject() {}
-        };
-        
-        #define QObject_connect(sender, signal, receiver, slot) ((void)0)
-        
-        #endif
-        EOF
-        
-        sudo cp /tmp/qobject_simple.h /usr/x86_64-w64-mingw32/include/QObject
-        sudo cp /tmp/qobject_simple.h /usr/x86_64-w64-mingw32/include/QObject.h
-
-    - name: Create simplified project file
-      run: |
-        # Create a simplified .pro file that doesn't use Qt
-        cat > CustomLoadScreen_simple.pro << 'EOF'
-        TARGET = CustomLoadScreen
-        TARGET_EXT = .asi
-        TEMPLATE = lib
-        CONFIG += dll c++14
-        
-        # Remove Qt dependency
-        QT =
-        CONFIG -= qt
-        
-        QMAKE_CC = x86_64-w64-mingw32-gcc
-        QMAKE_CXX = x86_64-w64-mingw32-g++
-        QMAKE_LINK = x86_64-w64-mingw32-g++
-        QMAKE_LINK_SHLIB = x86_64-w64-mingw32-g++
-        
-        QMAKE_LFLAGS_RELEASE += -static-libgcc -static-libstdc++
-        
-        DEFINES += WIN32 _WIN32 _WINDOWS
-        
-        INCLUDEPATH += /usr/x86_64-w64-mingw32/include
-        LIBS += -L/usr/x86_64-w64-mingw32/lib
-        
-        SOURCES += \
-            CustomLoadScreen.cpp \
-            loader.cpp \
-            llmo/ccallhook.cpp \
-            llmo/memsafe.cpp \
-            llmo/cshortasm.cpp \
-            sys/mman.c \
-            d3d9/proxydirectx.cpp \
-            d3d9/directx.cpp \
-            d3d9/color.cpp \
-            d3d9/d3drender.cpp \
-            d3d9/texture.cpp \
-            d3d9/MenuManager/ContextMenu.cpp \
-            d3d9/MenuManager/Listing.cpp \
-            d3d9/MenuManager/Menu.cpp \
-            d3d9/MenuManager/Node.cpp \
-            d3d9/MenuManager/NodeMenu.cpp \
-            d3d9/MenuManager/Text.cpp \
-            d3d9/MenuManager/VerticalLayout.cpp \
-            d3d9/MenuManager/CSlider.cpp \
-            CGame/CPed.cpp \
-            CGame/CPhysical.cpp \
-            CGame/Types.cpp \
-            CGame/methods.cpp \
-            CGame/CCam.cpp \
-            CGame/CCamera.cpp \
-            CGame/CVehicle.cpp
-            
-        HEADERS += \
-            CustomLoadScreen.h \
-            loader.h \
-            llmo/ccallhook.h \
-            llmo/memsafe.h \
-            llmo/cshortasm.h \
-            sys/mman.h \
-            d3d9/proxydirectx.h \
-            d3d9/directx.h \
-            d3d9/color.h \
-            d3d9/d3drender.h \
-            d3d9/texture.h \
-            d3d9/MenuManager/ContextMenu.h \
-            d3d9/MenuManager/Listing.h \
-            d3d9/MenuManager/Menu.h \
-            d3d9/MenuManager/Node.h \
-            d3d9/MenuManager/NodeMenu.h \
-            d3d9/MenuManager/Text.h \
-            d3d9/MenuManager/VerticalLayout.h \
-            d3d9/MenuManager/CSlider.h \
-            CGame/Types.h \
-            CGame/CPlaceable.h \
-            CGame/CEntity.h \
-            CGame/CPhysical.h \
-            CGame/CObject.h \
-            CGame/CHAnimIFrame.h \
-            CGame/CBone.h \
-            CGame/CPedIK.h \
-            CGame/CParticleData.h \
-            CGame/CWeaponSlot.h \
-            CGame/CPed.h \
-            CGame/CVehicle.h \
-            CGame/methods.h \
-            CGame/CCam.h \
-            CGame/CCamera.h
-            
-        LIBS += -lgdi32 -luser32 -lkernel32
-        EOF
-
-    - name: Create alternative simple Makefile
-      run: |
-        cat > Makefile << 'EOF'
-        CC = x86_64-w64-mingw32-gcc
-        CXX = x86_64-w64-mingw32-g++
-        
-        CXXFLAGS = -std=c++14 -O2 -Wall -DWIN32 -D_WIN32 -D_WINDOWS
-        CXXFLAGS += -I/usr/x86_64-w64-mingw32/include
-        CXXFLAGS += -static-libgcc -static-libstdc++
-        
-        LDFLAGS = -shared -static-libgcc -static-libstdc++
-        LIBS = -lgdi32 -luser32 -lkernel32
-        
-        SOURCES = CustomLoadScreen.cpp loader.cpp
-        OBJECTS = $(SOURCES:.cpp=.o)
-        TARGET = CustomLoadScreen.asi
-        
-        all: $(TARGET)
-        
-        $(TARGET): $(OBJECTS)
-        	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
-        
-        %.o: %.cpp
-        	$(CXX) $(CXXFLAGS) -c $< -o $@
-        
-        clean:
-        	rm -f $(OBJECTS) $(TARGET)
-        
-        .PHONY: all clean
-        EOF
+        # Verify MXE tools are available
+        which i686-w64-mingw32.static.posix-gcc || echo "MXE gcc not found"
+        ls -la /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/ || echo "Qt5 tools not found"
 
     - name: Build project
       run: |
-        echo "=== Project structure ==="
-        find . -name "*.cpp" -o -name "*.h" -o -name "*.pro" | head -20
+        # Set PATH to include MXE tools
+        export PATH="/mxe/usr/bin/:${PATH}"
         
-        echo "=== Trying qmake build ==="
-        # Try original .pro file first
-        if [ -f "CustomLoadScreen.pro" ]; then
-          echo "Using original .pro file"
-          /usr/lib/qt5/bin/qmake CustomLoadScreen.pro -o Makefile.qmake || echo "qmake failed with original .pro"
-        fi
+        echo "=== Environment Check ==="
+        echo "PATH: $PATH"
+        echo "PWD: $(pwd)"
+        echo "Available files:"
+        ls -la
         
-        # Try simplified .pro file
-        if [ -f "CustomLoadScreen_simple.pro" ]; then
-          echo "Using simplified .pro file"
-          /usr/lib/qt5/bin/qmake CustomLoadScreen_simple.pro -o Makefile.simple || echo "qmake failed with simple .pro"
-        fi
+        echo "=== Qt5 and MXE tools check ==="
+        which qmake || echo "qmake not in PATH"
+        /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake --version || echo "MXE qmake version failed"
         
-        echo "=== Trying Makefile build ==="
-        # Try simple Makefile approach
+        echo "=== Building project ==="
+        # Use the same command as in GitLab CI
+        /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake CONFIG+=release CustomLoadScreen.pro
+        
+        # Check if Makefile was generated
         if [ -f "Makefile" ]; then
-          make clean || true
-          make -j$(nproc) || echo "Makefile build failed"
+          echo "Makefile generated successfully"
+          ls -la Makefile
+        else
+          echo "ERROR: No Makefile generated"
+          exit 1
         fi
         
-        # Try qmake generated Makefile
-        if [ -f "Makefile.qmake" ]; then
-          make -f Makefile.qmake clean || true
-          make -f Makefile.qmake -j$(nproc) || echo "qmake Makefile build failed"
-        fi
-        
-        # Try simple Makefile
-        if [ -f "Makefile.simple" ]; then
-          make -f Makefile.simple clean || true
-          make -f Makefile.simple -j$(nproc) || echo "Simple Makefile build failed"
-        fi
+        # Build with make
+        make -j$(nproc --all)
         
         echo "=== Build results ==="
-        find . -name "*.asi" -o -name "*.dll" -o -name "*.exe" 2>/dev/null || echo "No output files found"
-        ls -la CustomLoadScreen.* 2>/dev/null || echo "No CustomLoadScreen output files"
+        ls -la
+        
+        # Check for output files
+        if [ -f "CustomLoadScreen.asi" ]; then
+          echo "SUCCESS: CustomLoadScreen.asi built successfully!"
+          ls -la CustomLoadScreen.asi
+          file CustomLoadScreen.asi
+        else
+          echo "ERROR: CustomLoadScreen.asi not found"
+          echo "Looking for any output files:"
+          find . -name "*.asi" -o -name "*.dll" -o -name "*.exe" 2>/dev/null || echo "No output files found"
+          exit 1
+        fi
+
+    - name: Verify artifacts
+      run: |
+        echo "=== Final artifact check ==="
+        ls -la CustomLoadScreen.asi || echo "ASI file missing"
+        ls -la CustomLoadScreen.png || echo "PNG file missing (optional)"
+        
+        if [ -f "CustomLoadScreen.asi" ]; then
+          echo "File size: $(stat -c%s CustomLoadScreen.asi) bytes"
+          echo "File type: $(file CustomLoadScreen.asi)"
+        fi
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
-      if: always()
+      if: success()
       with:
-        name: CustomLoadScreen-ASI
+        name: CustomLoadScreen-ASI-Build
         path: |
           CustomLoadScreen.asi
-          CustomLoadScreen.dll
-          *.asi
-          *.dll
-          Makefile*
-          *.log
+          CustomLoadScreen.png
         retention-days: 30
 
+    - name: Create Release
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: CustomLoadScreen Release v${{ github.run_number }}
+        body: |
+          Automated build of CustomLoadScreen ASI
+          
+          **Files included:**
+          - `CustomLoadScreen.asi` - Main ASI plugin file
+          - `CustomLoadScreen.png` - Loading screen image (if available)
+          
+          **Installation:**
+          1. Download `CustomLoadScreen.asi`
+          2. Place it in your game's root directory or scripts folder
+          3. Ensure `CustomLoadScreen.png` is in the same directory if using custom image
+        files: |
+          CustomLoadScreen.asi
+          CustomLoadScreen.png
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cache build objects
+      uses: actions/cache@v4
+      with:
+        path: release/*.o
+        key: ${{ runner.os }}-build-objects-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        restore-keys: |
+          ${{ runner.os }}-build-objects-
+
     - name: Debug information
-      if: always()
+      if: failure()
       run: |
         echo "=== Debug Information ==="
         echo "Current directory:"
         pwd
         echo "Directory contents:"
         ls -la
-        echo "MinGW tools:"
-        which x86_64-w64-mingw32-gcc || echo "mingw gcc not found"
-        x86_64-w64-mingw32-gcc --version || echo "mingw gcc version failed"
-        echo "Qt tools:"
-        which qmake || echo "qmake not found in PATH"
-        /usr/lib/qt5/bin/qmake -v || echo "qt5 qmake version failed"
-        echo "All Makefiles:"
-        find . -name "Makefile*" -exec ls -la {} \;
-        echo "Generated files:"
-        find . -name "*.o" -o -name "*.asi" -o -name "*.dll" | head -10
+        echo "PATH variable:"
+        echo $PATH
+        echo "MXE directory structure:"
+        ls -la /mxe/usr/ 2>/dev/null || echo "MXE not found"
+        ls -la /mxe/usr/bin/ 2>/dev/null || echo "MXE bin not found"
+        echo "Qt5 directory:"
+        ls -la /mxe/usr/i686-w64-mingw32.static.posix/qt5/ 2>/dev/null || echo "Qt5 not found"
+        echo "Generated Makefile (first 50 lines):"
+        head -50 Makefile 2>/dev/null || echo "No Makefile found"
+        echo "Make output:"
+        tail -50 make.log 2>/dev/null || echo "No make log found"
+        echo "Error logs:"
+        find . -name "*.log" -exec cat {} \; 2>/dev/null || echo "No log files found"

@@ -18,10 +18,25 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build .asi with qmake and make
+      - name: Find qmake
+        run: |
+          find /mxe -name qmake || true
+
+      - name: Try to build .asi with qmake and make
         run: |
           export PATH="/mxe/usr/bin:${PATH}"
-          /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake CONFIG+=release CustomLoadScreen.pro
+          # Попробуйте разные стандартные пути
+          if [ -x /mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake ]; then
+            QMAKE=/mxe/usr/i686-w64-mingw32.static.posix/qt5/bin/qmake
+          elif [ -x /mxe/usr/i686-w64-mingw32.static/qt5/bin/qmake ]; then
+            QMAKE=/mxe/usr/i686-w64-mingw32.static/qt5/bin/qmake
+          elif [ -x /mxe/usr/bin/i686-w64-mingw32.static-qmake-qt5 ]; then
+            QMAKE=/mxe/usr/bin/i686-w64-mingw32.static-qmake-qt5
+          else
+            echo "qmake not found"
+            exit 1
+          fi
+          $QMAKE CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts

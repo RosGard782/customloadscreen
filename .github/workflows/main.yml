@@ -28,31 +28,30 @@ jobs:
         uses: actions/cache@v4
         with:
           path: mxe
-          key: mxe-qtbase-v2-${{ runner.os }}-${{ hashFiles('**/mxe-version.txt') }}
+          key: mxe-i686-qtbase-v1-${{ runner.os }}-${{ hashFiles('**/mxe-version.txt') }}
           restore-keys: |
-            mxe-qtbase-v2-${{ runner.os }}-
+            mxe-i686-qtbase-v1-${{ runner.os }}-
 
       - name: Prepare mxe-version.txt
-        run: |
-          echo "qtbase" > mxe-version.txt
+        run: echo "qtbase" > mxe-version.txt
 
       - name: Clone and download MXE Qt5 (if not cached)
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/mxe/mxe.git --depth=1
           cd mxe
-          make download qtbase
+          make download qtbase MXE_TARGETS='i686-w64-mingw32.static'
 
       - name: Build MXE qtbase (Qt5, if not cached)
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cd mxe
-          make qtbase -j$(nproc)
+          make qtbase MXE_TARGETS='i686-w64-mingw32.static' -j$(nproc)
 
-      - name: Find qmake
+      - name: Find qmake for i686-w64-mingw32
         id: find-qmake
         run: |
-          QMAKE=$(find $GITHUB_WORKSPACE/mxe/usr/ -type f -name qmake | grep qt5 | head -n 1)
+          QMAKE=$(find $GITHUB_WORKSPACE/mxe/usr/ -type f -name qmake | grep i686 | grep qt5 | head -n 1)
           if [ -z "$QMAKE" ]; then
             echo "qmake not found"
             exit 1
@@ -60,10 +59,10 @@ jobs:
           echo "QMAKE=$QMAKE" >> $GITHUB_ENV
           echo "Found qmake at $QMAKE"
 
-      - name: Build .asi with qmake and make
+      - name: Build .asi with qmake and make (i686)
         run: |
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
-          $QMAKE CONFIG+=release CustomLoadScreen.pro
+          $QMAKE -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts

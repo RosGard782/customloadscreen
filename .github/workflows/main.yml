@@ -61,10 +61,12 @@ jobs:
       - name: Build .asi with qmake and make (i686)
         run: |
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
-          export QMAKESPEC=$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5/mkspecs/win32-g++
           export QTDIR=$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5
+          export QMAKESPEC=$QTDIR/mkspecs/win32-g++
           export CC=i686-w64-mingw32.static-gcc
           export CXX=i686-w64-mingw32.static-g++
+          rm -f Makefile Makefile.Release
+          rm -rf release
           $QMAKE -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 

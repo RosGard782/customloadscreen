@@ -1,4 +1,4 @@
-name: Build .asi Script
+name: Build CustomLoadScreen
 
 on:
   push:
@@ -50,18 +50,14 @@ jobs:
 
       - name: Build .asi with qmake and make (i686)
         run: |
-          # Очистка предыдущих сборочных файлов
-          rm -f Makefile Makefile.Release
+          rm -f Makefile Makefile.Release .qmake.stash
           rm -rf release
-
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
           export QTDIR="$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5"
           export QMAKESPEC="$QTDIR/mkspecs/win32-g++"
           export CC=i686-w64-mingw32.static-gcc
           export CXX=i686-w64-mingw32.static-g++
-
-          # Важно: используем только нужный qmake!
-          "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
+          "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release custom_load_screen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts
@@ -69,5 +65,5 @@ jobs:
         with:
           name: customloadscreen-artifacts
           path: |
-            CustomLoadScreen.asi
-            CustomLoadScreen.png
+            ../CustomLoadScreen.asi
+            ../CustomLoadScreen.png

@@ -48,26 +48,20 @@ jobs:
           cd mxe
           make qtbase MXE_TARGETS='i686-w64-mingw32.static' -j$(nproc)
 
-      - name: Find qmake for i686-w64-mingw32
-        id: find-qmake
-        run: |
-          QMAKE=$(find $GITHUB_WORKSPACE/mxe/usr/ -type f -name qmake | grep i686 | grep qt5 | head -n 1)
-          if [ -z "$QMAKE" ]; then
-            echo "qmake not found"
-            exit 1
-          fi
-          echo "QMAKE=$QMAKE" >> $GITHUB_ENV
-
       - name: Build .asi with qmake and make (i686)
         run: |
-          export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
-          export QTDIR=$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5
-          export QMAKESPEC=$QTDIR/mkspecs/win32-g++
-          export CC=i686-w64-mingw32.static-gcc
-          export CXX=i686-w64-mingw32.static-g++
+          # Очистка предыдущих сборочных файлов
           rm -f Makefile Makefile.Release
           rm -rf release
-          $QMAKE -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
+
+          export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
+          export QTDIR="$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5"
+          export QMAKESPEC="$QTDIR/mkspecs/win32-g++"
+          export CC=i686-w64-mingw32.static-gcc
+          export CXX=i686-w64-mingw32.static-g++
+
+          # Важно: используем только нужный qmake!
+          "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts

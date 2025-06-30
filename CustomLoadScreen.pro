@@ -94,8 +94,4 @@ LIBS += -ld3d9 \
 		-luser32 \
 		-
 
-		QMAKE_CC = x86_64-w64-mingw32-gcc
-QMAKE_CXX = x86_64-w64-mingw32-g++
-QMAKE_LINK = x86_64-w64-mingw32-g++
-QMAKE_LINK_SHLIB = x86_64-w64-mingw32-g++
-
+		

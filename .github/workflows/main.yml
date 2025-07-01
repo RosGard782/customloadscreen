@@ -24,29 +24,29 @@ jobs:
             libssl-dev libtool-bin libxml-parser-perl lzip make openssl \
             python3 python3-mako python3-pip ruby sed unzip wget xz-utils
 
+      - name: Prepare MXE version marker
+        run: echo "qtbase-v5.15.2" > mxe-version.txt
+
       - name: Cache MXE build
+        id: cache-mxe
         uses: actions/cache@v4
         with:
           path: mxe
-          key: mxe-i686-qtbase-v1-${{ runner.os }}-${{ hashFiles('**/mxe-version.txt') }}
+          key: mxe-i686-qtbase-v1-${{ runner.os }}-${{ hashFiles('mxe-version.txt') }}
           restore-keys: |
             mxe-i686-qtbase-v1-${{ runner.os }}-
 
-      - name: Prepare mxe-version.txt
-        run: echo "qtbase" > mxe-version.txt
-
-      - name: Clone and download MXE Qt5 (if not cached)
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Download and build MXE (if not cached)
+        if: steps.cache-mxe.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/mxe/mxe.git --depth=1
           cd mxe
-          make download qtbase MXE_TARGETS='i686-w64-mingw32.static'
-
-      - name: Build MXE qtbase (Qt5, if not cached)
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          cd mxe
           make qtbase MXE_TARGETS='i686-w64-mingw32.static' -j$(nproc)
+
+      - name: Ensure MXE path is correct
+        run: |
+          ls -lah mxe/usr/bin
+          ls -lah mxe/usr/i686-w64-mingw32.static/qt5/bin
 
       - name: Build .asi with qmake and make (i686)
         run: |
@@ -60,10 +60,14 @@ jobs:
           "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
+      - name: Show build artifacts
+        run: |
+          ls -lah
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: customloadscreen-artifacts
           path: |
-            ../CustomLoadScreen.asi
-            ../CustomLoadScreen.png
+            CustomLoadScreen.asi
+            CustomLoadScreen.png

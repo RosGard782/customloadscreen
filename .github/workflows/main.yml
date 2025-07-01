@@ -24,34 +24,25 @@ jobs:
             libssl-dev libtool-bin libxml-parser-perl lzip make openssl \
             python3 python3-mako python3-pip ruby sed unzip wget xz-utils
 
-      - name: Prepare MXE version marker
-        run: echo "qtbase-v5.15.2" > mxe-version.txt
-
       - name: Cache MXE build
-        id: cache-mxe
         uses: actions/cache@v4
         with:
           path: mxe
-          key: mxe-i686-qtbase-v1-${{ runner.os }}-${{ hashFiles('mxe-version.txt') }}
+          key: mxe-i686-qtbase-v2-${{ runner.os }}
           restore-keys: |
-            mxe-i686-qtbase-v1-${{ runner.os }}-
+            mxe-i686-qtbase-v2-${{ runner.os }}-
 
       - name: Download and build MXE (if not cached)
-        if: steps.cache-mxe.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/mxe/mxe.git --depth=1
-          cd mxe
-          make qtbase MXE_TARGETS='i686-w64-mingw32.static' -j$(nproc)
-
-      - name: Ensure MXE path is correct
-        run: |
-          ls -lah mxe/usr/bin
-          ls -lah mxe/usr/i686-w64-mingw32.static/qt5/bin
+          if [ ! -d "mxe" ]; then
+            git clone https://github.com/mxe/mxe.git --depth=1
+            cd mxe
+            make qtbase MXE_TARGETS='i686-w64-mingw32.static' -j$(nproc)
+            cd ..
+          fi
 
       - name: Build .asi with qmake and make (i686)
         run: |
-          rm -f Makefile Makefile.Release .qmake.stash
-          rm -rf release
           export PATH="$GITHUB_WORKSPACE/mxe/usr/bin:$PATH"
           export QTDIR="$GITHUB_WORKSPACE/mxe/usr/i686-w64-mingw32.static/qt5"
           export QMAKESPEC="$QTDIR/mkspecs/win32-g++"
@@ -60,9 +51,18 @@ jobs:
           "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
-      - name: Show build artifacts
+      - name: Find build artifacts and move to workspace
         run: |
-          ls -lah
+          # Найти .asi если он в subdir и перенести в корень
+          asi_path=$(find . -name 'CustomLoadScreen.asi' | head -n1)
+          png_path=$(find . -name 'CustomLoadScreen.png' | head -n1)
+          if [ -f "$asi_path" ] && [ "$asi_path" != "./CustomLoadScreen.asi" ]; then
+            mv "$asi_path" ./CustomLoadScreen.asi
+          fi
+          if [ -f "$png_path" ] && [ "$png_path" != "./CustomLoadScreen.png" ]; then
+            mv "$png_path" ./CustomLoadScreen.png
+          fi
+          ls -l
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

@@ -57,7 +57,7 @@ jobs:
           export QMAKESPEC="$QTDIR/mkspecs/win32-g++"
           export CC=i686-w64-mingw32.static-gcc
           export CXX=i686-w64-mingw32.static-g++
-          "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release custom_load_screen.pro
+          "$QTDIR/bin/qmake" -spec win32-g++ CONFIG+=release CustomLoadScreen.pro
           make -j$(nproc)
 
       - name: Upload build artifacts

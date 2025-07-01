@@ -49,9 +49,34 @@ HRESULT CustomLoadScreen::Present(const RECT *pSourceRect, const RECT *pDestRect
     pTexture->Begin();
     pTexture->Clear(eCdBlack);
 
-    // Draw project name
-    /*pFont->PrintShadow(5, 5, -1, QString(PROJECT_NAME) + " by SR_team");*/
-    pFont->PrintShadow(5, 20, -1, "Loading: " + QString::number(11.111111 * g_vars.gameSatate) + "%");
+    // Нарисовать полоску загрузки внизу
+    int barWidth = g_class.params->BackBufferWidth - 40; // Отступы по 20px слева и справа
+    int barHeight = 20;
+    int barX = 20;
+    int barY = g_class.params->BackBufferHeight - barHeight - 40; // 40px от низа
+
+    // Процент загрузки (0-100)
+    float percent = 11.111111f * g_vars.gameSatate;
+    if (percent > 100.0f) percent = 100.0f;
+    if (percent < 0.0f) percent = 0.0f;
+
+    int filledWidth = static_cast<int>(barWidth * (percent / 100.0f));
+
+    // Рамка полосы
+    pTexture->DrawRect(barX, barY, barWidth, barHeight, 0xFF444444); // Тёмно-серый контур
+
+    // Фон полосы
+    pTexture->DrawRect(barX + 2, barY + 2, barWidth - 4, barHeight - 4, 0xFF222222); // Более тёмный фон
+
+    // Заполненная часть полосы
+    pTexture->DrawRect(barX + 2, barY + 2, filledWidth - 4, barHeight - 4, 0xFF00AAFF); // Голубая полоска
+
+    // Текст процента по центру полосы
+    QString percentText = QString::number(static_cast<int>(percent)) + "%";
+    int textWidth = pFont->GetTextWidth(percentText);
+    int textX = barX + (barWidth - textWidth) / 2;
+    int textY = barY + (barHeight - pFont->GetTextHeight()) / 2;
+    pFont->PrintShadow(textX, textY, -1, percentText);
 
     pTexture->End();
     pTexture->Render(0, 0, g_class.params->BackBufferWidth, g_class.params->BackBufferHeight); // Draw texture

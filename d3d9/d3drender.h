@@ -26,6 +26,19 @@
 #include "../loader.h"
 #include "color.h"
 
+#include <d3d9.h>
+#include <vector>
+
+// === Добавлено для полосы загрузки ===
+
+// Глобальная переменная прогресса (0.0f ... 1.0f)
+extern float g_LoadProgress;
+
+// Функция для рисования полосы загрузки снизу экрана
+void DrawLoadingBar(IDirect3DDevice9* dev, float progress);
+
+// === Конец добавленного ===
+
 class	CD3DFont;
 class	CD3DRender;
 

@@ -1,7 +1,7 @@
 QT       -= gui
 # QT       += network
 
-TARGET = ../CustomLoadScreen
+TARGET = CustomLoadScreen
 TARGET_EXT = .asi
 TEMPLATE = lib
 CONFIG += dll \

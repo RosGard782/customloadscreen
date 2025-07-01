@@ -92,6 +92,3 @@ LIBS += -ld3d9 \
 		-ld3dx9 \
 		-lgdi32 \
 		-luser32 \
-		-
-
-		
